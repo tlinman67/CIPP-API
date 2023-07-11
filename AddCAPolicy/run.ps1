@@ -4,10 +4,10 @@ using namespace System.Net
 param($Request, $TriggerMetadata)
 
 $APIName = $TriggerMetadata.FunctionName
-Log-Request -user $request.headers.'x-ms-client-principal' -API $APINAME  -message "Accessed this API" -Sev "Debug"
+Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME  -message "Accessed this API" -Sev "Debug"
 
 $Tenants = ($Request.body | Select-Object Select_*).psobject.properties.value
-if ("AllTenants" -in $Tenants) { $Tenants = (Get-Tenants).DefaultDomainName }
+if ("AllTenants" -in $Tenants) { $Tenants = (Get-Tenants).defaultDomainName }
 $displayname = ($request.body.RawJSON | ConvertFrom-Json).Displayname
 function Remove-EmptyArrays ($Object) {
     if ($Object -is [Array]) {
@@ -36,6 +36,9 @@ function Remove-EmptyArrays ($Object) {
 
 $JSONObj = $request.body.RawJSON | ConvertFrom-Json | Select-Object * -ExcludeProperty ID, GUID, *time*
 Remove-EmptyArrays $JSONObj
+#Remove context as it does not belong in the payload.
+$JsonObj.grantControls.PSObject.Properties.Remove('authenticationStrength@odata.context')
+$JsonObj.conditions.users.excludeGuestsOrExternalUsers.externalTenants.PSObject.Properties.Remove('@odata.type')
 $RawJSON = $JSONObj | ConvertTo-Json -Depth 10
 
 $results = foreach ($Tenant in $tenants) {
@@ -46,13 +49,13 @@ $results = foreach ($Tenant in $tenants) {
             Throw "Conditional Access Policy with Display Name $($Displayname) Already exists"
         }
     
-        $CreateRequest = New-GraphPOSTRequest -uri "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies" -tenantid $tenant -type POST -body $RawJSON
-        Log-Request -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($Tenant) -message "Added Conditional Access Policy $($Displayname)" -Sev "Error"
-        "Succesfully added Conditional Access Policy for $($Tenant)"
+        $CreateRequest = New-GraphPOSTRequest -uri "https://graph.microsoft.com/beta/identity/conditionalAccess/policies" -tenantid $tenant -type POST -body $RawJSON
+        Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($Tenant) -message "Added Conditional Access Policy $($Displayname)" -Sev "Error"
+        "Successfully added Conditional Access Policy for $($Tenant)"
     }
     catch {
         "Failed to add policy for $($Tenant): $($_.Exception.Message)"
-        Log-Request -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($Tenant) -message "Failed adding Conditional Access Policy $($Displayname). Error: $($_.Exception.Message)" -Sev "Error"
+        Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($Tenant) -message "Failed adding Conditional Access Policy $($Displayname). Error: $($_.Exception.Message)" -Sev "Error"
         continue
     }
 

@@ -4,11 +4,16 @@
 param($Request, $TriggerMetadata)
 
 $APIName = $TriggerMetadata.FunctionName
-Log-Request -user $request.headers.'x-ms-client-principal' -API $APINAME  -message "Accessed this API" -Sev "Debug"
+Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
 $Table = Get-CIPPTable -TableName SchedulerConfig
-$Config = Get-AzTableRow -Table $table -RowKey "CippNotifications" -PartitionKey 'CippNotifications'
-
+$Filter = "RowKey eq 'CippNotifications' and PartitionKey eq 'CippNotifications'"
+$Config = Get-AzDataTableEntity @Table -Filter $Filter | ConvertTo-Json -Depth 10 | ConvertFrom-Json -Depth 10
+$config | Add-Member -NotePropertyValue @() -NotePropertyName 'logsToInclude' -Force
+$config.logsToInclude = @(([pscustomobject]$config | Select-Object * -ExcludeProperty schedule, type, tenantid, onepertenant, sendtoIntegration, partitionkey, rowkey, tenant, ETag, email, logsToInclude, timestamp, webhook).psobject.properties.name)
+if (!$config.logsToInclude) {
+    $config.logsToInclude = @('None')
+}
 $body = $Config
 
 # Associate values to output bindings by calling 'Push-OutputBinding'.

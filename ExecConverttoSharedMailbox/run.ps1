@@ -4,7 +4,7 @@ using namespace System.Net
 param($Request, $TriggerMetadata)
 
 $APIName = $TriggerMetadata.FunctionName
-Log-Request -user $request.headers.'x-ms-client-principal' -API $APINAME  -message "Accessed this API" -Sev "Debug"
+Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME  -message "Accessed this API" -Sev "Debug"
 
 
 # Write to the Azure Functions log stream.
@@ -17,12 +17,12 @@ Try {
     $tenantfilter = $Request.Query.TenantFilter 
     New-ExoRequest -tenantid $TenantFilter -cmdlet "Set-mailbox" -cmdParams @{Identity = $request.query.id; type = $MailboxType }
 
-    $Results = [pscustomobject]@{"Results" = "Succesfully completed task." }
-    Log-Request -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($tenantfilter) -message "Converted mailbox $($request.query.id)" -Sev "Info"
+    $Results = [pscustomobject]@{"Results" = "Successfully converted $($request.query.id)." }
+    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($tenantfilter) -message "Converted mailbox $($request.query.id)" -Sev "Info"
 }
 catch {
-    Log-Request -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($tenantfilter) -message "Convert to shared mailbox failed: $($_.Exception.Message)" -Sev "Error"
-    $Results = [pscustomobject]@{"Results" = "Failed. $_.Exception.Message" }
+    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($tenantfilter) -message "Convert to shared mailbox failed: $($_.Exception.Message)" -Sev "Error"
+    $Results = [pscustomobject]@{"Results" = "Failed to convert $($request.query.id) - $($_.Exception.Message)" }
 }
 # Associate values to output bindings by calling 'Push-OutputBinding'.
 Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
